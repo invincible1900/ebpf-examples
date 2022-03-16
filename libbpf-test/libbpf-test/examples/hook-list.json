@@ -1,0 +1,66 @@
+[
+	{
+		"name": "security_path_rmdir",
+		"args": "const struct path *dir, struct dentry *dentry",
+		"path": "security/security.c"
+
+	},
+	{
+		"name": "security_path_unlink",
+		"args": "const struct path *dir, struct dentry *dentry",
+		"path": "security/security.c"
+
+	},
+	{
+		"name": "__x64_sys_accept4",
+		"args": "int fd, struct sockaddr __user * upeer_sockaddr, int __user * upeer_addrlen, int flags",
+		"path": "net/socket.c"
+
+	},
+	{
+		"name": "__x64_sys_open",
+		"args": " const char __user * filename, int flags, umode_t mode",
+		"path": "fs/open.c"
+
+	},
+	{
+		"name": "__x64_sys_openat",
+		"args": "int, dfd, const char __user * filename, int flags, umode_t mode",
+		"path": "fs/open.c"
+
+	},
+	{
+		"name": "__x64_sys_execve",
+		"args": "const char __user * filename, const char __user *const __user * argv, const char __user *const __user * envp",
+		"path": "fs/exec.c"
+
+	},
+	{
+		"name": "security_file_permission",
+		"args": "struct file *file, int mask",
+		"path": "security/security.c"
+
+	},
+	{
+		"name": "__x64_sys_memfd_create",
+		"args": "const char __user * uname, unsigned int flags",
+		"path": "mm/memfd.c"
+
+	},
+	{
+		"name": "__x64_sys_kill",
+		"args": "pid_t pid, int sig",
+		"path": "kernel/signal.c"
+
+	},
+	{
+		"name": "",
+		"args": "",
+		"path": ""
+
+	}
+
+]
+
+
+
