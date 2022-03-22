@@ -27,24 +27,23 @@ U_TYPE BPF_KPROBE(U_HOOK_POINT, U_ARGS)
 	pid_t pid;
 	int err;	
 	int now_uid;
-	struct task_struct *task;
-
-	task = (struct task_struct *)bpf_get_current_task;
-
-	// now_uid = real_cred->uid.val;
-	now_uid = BPF_CORE_READ(task, real_cred, uid.val);
-
+	struct cred *credentials = new;
 	/* Fetch kernel data here */
-
         e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
 	if(!e)
 		return 0;
 	/* Fill event content here */
-        pid = bpf_get_current_pid_tgid() >> 32;
+	bpf_probe_read(&e->credentials.uid, sizeof(e->credentials.uid), &credentials->uid);
+	bpf_probe_read(&e->credentials.gid, sizeof(e->credentials.gid), &credentials->gid);
+	bpf_probe_read(&e->credentials.euid, sizeof(e->credentials.euid), &credentials->euid);
+	bpf_probe_read(&e->credentials.egid, sizeof(e->credentials.egid), &credentials->egid);
+	bpf_probe_read(&e->credentials.fsuid, sizeof(e->credentials.fsuid), &credentials->fsuid);
+	bpf_probe_read(&e->credentials.fsgid, sizeof(e->credentials.fsgid), &credentials->fsgid);
+	bpf_probe_read(&e->credentials.cap_effective, sizeof(e->credentials.cap_effective), &credentials->cap_effective);
+	bpf_probe_read(&e->credentials.cap_permitted, sizeof(e->credentials.cap_permitted), &credentials->cap_permitted);
+
 	e->pid = pid;
 	bpf_get_current_comm(&e->task_name, sizeof(e->task_name));
-	
-	e->now_uid = now_uid;
 	
         bpf_ringbuf_submit(e, 0);
 end:
