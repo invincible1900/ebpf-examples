@@ -1,0 +1,6 @@
+{
+	"name": "do_unlinkat", 
+	"args": "int dfd, struct filename *name",
+	"type": "long",
+	"path": "fs/namei.c"
+}
