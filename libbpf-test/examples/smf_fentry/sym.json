@@ -1,0 +1,6 @@
+{
+	"name": "security_mmap_file", 
+	"args": "struct file *file, unsigned long prot, unsigned long flags",
+	"type": "int",
+	"path": "security/security.c"
+}

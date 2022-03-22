@@ -7,10 +7,10 @@
 #include "kprobe.h"
 
 #define __user
-#define U_HOOK_POINT [NAME]
-#define U_ARGS [ARGS]
-#define U_KPROBE "kprobe/[NAME]"
-#define U_TYPE [TYPE]
+#define U_HOOK_POINT security_inode_rmdir
+#define U_ARGS struct inode *dir, struct dentry *dentry
+#define U_KPROBE "kprobe/security_inode_rmdir"
+#define U_TYPE int
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 

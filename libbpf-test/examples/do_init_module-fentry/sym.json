@@ -1,0 +1,6 @@
+{
+	"name": "do_init_module", 
+	"args": "struct module *mod",
+	"type": "int",
+	"path": "kernel/module.c"
+}

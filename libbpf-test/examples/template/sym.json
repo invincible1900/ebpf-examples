@@ -1,0 +1,6 @@
+{
+	"name": "security_inode_rmdir", 
+	"args": "struct inode *dir, struct dentry *dentry",
+	"type": "int",
+	"path": "security/security.c"
+}

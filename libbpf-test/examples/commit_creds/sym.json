@@ -1,0 +1,6 @@
+{
+	"name": "commit_creds", 
+	"args": "struct cred *new",
+	"type": "int",
+	"path": "kernel/cred.c"
+}

@@ -1,0 +1,6 @@
+{
+	"name": "security_inode_create", 
+	"args": "struct inode *dir, struct dentry *dentry, umode_t mode",
+	"type": "int",
+	"path": "security/security.c"
+}

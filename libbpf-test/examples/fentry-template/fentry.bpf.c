@@ -4,12 +4,12 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
-#include "kprobe.h"
+#include "fentry.h"
 
 #define __user
 #define U_HOOK_POINT [NAME]
 #define U_ARGS [ARGS]
-#define U_KPROBE "kprobe/[NAME]"
+#define U_FENTRY "fentry/[NAME]"
 #define U_TYPE [TYPE]
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
@@ -20,8 +20,8 @@ struct {
 } rb SEC(".maps");
 
 
-SEC(U_KPROBE)
-U_TYPE BPF_KPROBE(U_HOOK_POINT, U_ARGS)
+SEC(U_FENTRY)
+U_TYPE BPF_PROG(U_HOOK_POINT, U_ARGS)
 {
 	struct event *e;
 	pid_t pid;

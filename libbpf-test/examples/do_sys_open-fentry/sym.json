@@ -1,0 +1,6 @@
+{
+	"name": "path_openat", 
+	"args": "struct nameidata *nd, const struct open_flags *op, unsigned flags",
+	"type": "struct file *",
+	"path": "kernel/module.c"
+}

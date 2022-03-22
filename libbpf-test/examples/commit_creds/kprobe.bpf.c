@@ -7,10 +7,10 @@
 #include "kprobe.h"
 
 #define __user
-#define U_HOOK_POINT [NAME]
-#define U_ARGS [ARGS]
-#define U_KPROBE "kprobe/[NAME]"
-#define U_TYPE [TYPE]
+#define U_HOOK_POINT commit_creds
+#define U_ARGS struct cred *new
+#define U_KPROBE "kprobe/commit_creds"
+#define U_TYPE int
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
@@ -25,9 +25,14 @@ U_TYPE BPF_KPROBE(U_HOOK_POINT, U_ARGS)
 {
 	struct event *e;
 	pid_t pid;
-	int err;
+	int err;	
+	int now_uid;
+	struct task_struct *task;
 
-        pid = bpf_get_current_pid_tgid() >> 32;
+	task = (struct task_struct *)bpf_get_current_task;
+
+	// now_uid = real_cred->uid.val;
+	now_uid = BPF_CORE_READ(task, real_cred, uid.val);
 
 	/* Fetch kernel data here */
 
@@ -35,7 +40,11 @@ U_TYPE BPF_KPROBE(U_HOOK_POINT, U_ARGS)
 	if(!e)
 		return 0;
 	/* Fill event content here */
+        pid = bpf_get_current_pid_tgid() >> 32;
 	e->pid = pid;
+	bpf_get_current_comm(&e->task_name, sizeof(e->task_name));
+	
+	e->now_uid = now_uid;
 	
         bpf_ringbuf_submit(e, 0);
 end:
