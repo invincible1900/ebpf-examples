@@ -38,7 +38,7 @@ U_TYPE BPF_PROG(U_HOOK_POINT, U_ARGS)
 	if(!mm)
 		return 0;
 	exe_file = BPF_CORE_READ(mm, exe_file);
-	bpf_d_path(&exe_file->f_path, buff, 128);
+	//bpf_d_path(&exe_file->f_path, buff, 128);
 
         pid = bpf_get_current_pid_tgid() >> 32;
 
