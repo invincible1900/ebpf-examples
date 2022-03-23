@@ -1,0 +1,6 @@
+{
+	"name": "vfs_unlink", 
+	"args": "struct inode *dir, struct dentry *dentry, struct inode **delegated_inode",
+	"type": "int",
+	"path": "fs/namei.c"
+}
