@@ -28,12 +28,40 @@ U_TYPE BPF_KPROBE(U_HOOK_POINT, U_ARGS)
 	pid_t pid;
 	int err;
 
+	if(!dentry)
+		return 0;
+
+
     pid = bpf_get_current_pid_tgid() >> 32;
 
+    struct syscall_cache_t syscall = {
+        .type = EVENT_UNLINK,
+		.policy = {},
+        .unlink = {
+            .flags = 0,
+			.dentry = dentry,
+        }
+    };
+
+
+	u64 key = bpf_get_current_pid_tgid();	
+
+    set_file_inode(dentry, &syscall.unlink.file, 1);
+    fill_file_metadata(dentry, &syscall.unlink.file.metadata);
+
+    syscall.resolver.dentry = dentry;
+    syscall.resolver.key = syscall.unlink.file.path_key;
+    syscall.resolver.discarder_type = syscall.policy.mode != NO_FILTER ? EVENT_UNLINK : 0;
+    syscall.resolver.callback = DR_UNLINK_CALLBACK_KPROBE_KEY;
+    syscall.resolver.iteration = 0;
+    syscall.resolver.ret = 0;
+
 	
-	// resolve_dentry(ctx, DR_KPROBE);
+	bpf_map_update_elem(&syscalls, &key, &syscall, BPF_ANY);
+
+	//resolve_dentry(ctx, DR_KPROBE);
 	//kprobe_dentry_resolver_kern(ctx);
-	dentry_resolver_kern(ctx, &dentry_resolver_kprobe_progs, &dentry_resolver_kprobe_callbacks, DR_KPROBE_DENTRY_RESOLVER_KERN_KEY);
+	// dentry_resolver_kern(ctx, &dentry_resolver_kprobe_progs, &dentry_resolver_kprobe_callbacks, DR_KPROBE_DENTRY_RESOLVER_KERN_KEY);
 	/* Fetch kernel data here */
 
         e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);

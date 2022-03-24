@@ -8,7 +8,31 @@
 #define DR_KPROBE     1
 #define DR_TRACEPOINT 2
 
+#define OVERLAYFS_SUPER_MAGIC 0x794c7630
+
 static int (*bpf_tail_call_compat)(void* ctx, void* map, int key) = (void*)BPF_FUNC_tail_call;
+
+enum policy_mode
+{
+    NO_FILTER = 0,
+    ACCEPT = 1,
+    DENY = 2,
+};
+
+enum dr_kprobe_progs
+{
+    DR_OPEN_CALLBACK_KPROBE_KEY = 1,
+    DR_SETATTR_CALLBACK_KPROBE_KEY,
+    DR_MKDIR_CALLBACK_KPROBE_KEY,
+    DR_MOUNT_CALLBACK_KPROBE_KEY,
+    DR_SECURITY_INODE_RMDIR_CALLBACK_KPROBE_KEY,
+    DR_SETXATTR_CALLBACK_KPROBE_KEY,
+    DR_UNLINK_CALLBACK_KPROBE_KEY,
+    DR_LINK_SRC_CALLBACK_KPROBE_KEY,
+    DR_LINK_DST_CALLBACK_KPROBE_KEY,
+    DR_RENAME_CALLBACK_KPROBE_KEY,
+    DR_SELINUX_CALLBACK_KPROBE_KEY,
+};
 
 struct path_key_t {
     u64 ino;
@@ -73,11 +97,11 @@ struct syscall_cache_t {
 
     union{
         struct {
-            int flags;
-            umode_t mode;
             struct dentry *dentry;
             struct file_t file;
-        } open;
+            int flags;
+        } unlink;
+
     };
 };
 
@@ -137,26 +161,6 @@ enum event_type
 
     //EVENT_ALL = 0xffffffffffffffff // used as a mask for all the events
 };
-
-#if 0
-struct bpf_map_def SEC("maps/syscalls") syscalls = {
-    .type = BPF_MAP_TYPE_LRU_HASH,
-    .key_size = sizeof(u64),
-    .value_size = sizeof(struct syscall_cache_t),
-    .max_entries = 1024,
-    // .pinning = 0,
-    // .namespace = "",
-};
-#else
-struct {
-    __uint(type, BPF_MAP_TYPE_LRU_HASH);
-    __uint(key_size, sizeof(u64));
-    __uint(value_size, sizeof(struct syscall_cache_t));
-    __uint(max_entries, 1024);
-	__uint(pinning, 0);
-
-} syscalls SEC(".maps");
-#endif
 
 
 
@@ -222,6 +226,15 @@ __attribute__((always_inline)) void fill_activity_dump_discarder_state(void *ctx
 #endif
 
 #if 0
+struct bpf_map_def SEC("maps/syscalls") syscalls = {
+    .type = BPF_MAP_TYPE_LRU_HASH,
+    .key_size = sizeof(u64),
+    .value_size = sizeof(struct syscall_cache_t),
+    .max_entries = 1024,
+    // .pinning = 0,
+    // .namespace = "",
+};
+
 struct bpf_map_def SEC("maps/pathnames") pathnames = {
     .type = BPF_MAP_TYPE_LRU_HASH,
     .key_size = sizeof(struct path_key_t),
@@ -244,7 +257,26 @@ struct bpf_map_def SEC("maps/dentry_resolver_kprobe_progs") dentry_resolver_kpro
     .value_size = sizeof(u32),
     .max_entries = 4,
 };
+
+struct bpf_map_def SEC("maps/path_id") path_id = {
+    .type = BPF_MAP_TYPE_ARRAY,
+    .key_size = sizeof(u32),
+    .value_size = sizeof(u32),
+    .max_entries = 1,
+    .pinning = 0,
+    .namespace = "",
+};
+
 #else
+struct {
+    __uint(type, BPF_MAP_TYPE_LRU_HASH);
+    __uint(key_size, sizeof(u64));
+    __uint(value_size, sizeof(struct syscall_cache_t));
+    __uint(max_entries, 1024);
+	__uint(pinning, 0);
+
+} syscalls SEC(".maps");
+
 struct {
 	__uint(type, BPF_MAP_TYPE_LRU_HASH);
 	__uint(key_size, sizeof(struct path_key_t));
@@ -271,7 +303,93 @@ struct {
 } dentry_resolver_kprobe_progs SEC(".maps");
 
 
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__uint(key_size, sizeof(u32));	
+	__uint(value_size, sizeof(u32));
+	__uint(max_entries, 1);
+
+} path_id SEC(".maps") ;
+
+
 #endif
+
+static __attribute__((always_inline)) int is_overlayfs(struct dentry *dentry) {
+    struct inode *d_inode;
+    bpf_probe_read(&d_inode, sizeof(d_inode), &dentry->d_inode);
+
+    struct super_block *sb;
+    bpf_probe_read(&sb, sizeof(sb), &d_inode->i_sb);
+
+    u64 magic;
+    // bpf_probe_read(&magic, sizeof(magic), (char *)sb + get_sb_magic_offset());
+    bpf_probe_read(&magic, sizeof(magic), (char *)sb + 96);
+
+    return magic == OVERLAYFS_SUPER_MAGIC;
+}
+
+static unsigned long __attribute__((always_inline)) get_inode_ino(struct inode *inode) {
+    unsigned long ino;
+    bpf_probe_read(&ino, sizeof(inode), &inode->i_ino);
+    return ino;
+}
+
+static struct inode* __attribute__((always_inline)) get_dentry_inode(struct dentry *dentry) {
+    struct inode *d_inode;
+    bpf_probe_read(&d_inode, sizeof(d_inode), &dentry->d_inode);
+    return d_inode;
+}
+
+static unsigned long __attribute__((always_inline)) get_dentry_ino(struct dentry *dentry) {
+    return get_inode_ino(get_dentry_inode(dentry));
+}
+
+static __attribute__((always_inline)) u32 get_path_id(int invalidate) {
+    u32 key = 0;
+
+    u32 *prev_id = bpf_map_lookup_elem(&path_id, &key);
+    if (!prev_id) {
+        return 0;
+    }
+
+    u32 id = *prev_id;
+
+    // need to invalidate the current path id for event which may change the association inode/name like
+    // unlink, rename, rmdir.
+    if (invalidate) {
+        __sync_fetch_and_add(prev_id, 1);
+    }
+
+    return id;
+}
+
+static __attribute__((always_inline)) void set_file_inode(struct dentry *dentry, struct file_t *file, int invalidate) {
+    file->path_key.path_id = get_path_id(invalidate);
+    if (!file->path_key.ino) {
+        file->path_key.ino = get_dentry_ino(dentry);
+    }
+#if 0
+    if (is_overlayfs(dentry)) {
+        set_overlayfs_ino(dentry, &file->path_key.ino, &file->flags);
+    }
+#endif
+}
+
+
+
+static void __attribute__((always_inline)) fill_file_metadata(struct dentry* dentry, struct file_metadata_t* file) {
+    struct inode *d_inode;
+    bpf_probe_read(&d_inode, sizeof(d_inode), &dentry->d_inode);
+
+    bpf_probe_read(&file->nlink, sizeof(file->nlink), (void *)&d_inode->i_nlink);
+    bpf_probe_read(&file->mode, sizeof(file->mode), &d_inode->i_mode);
+    bpf_probe_read(&file->uid, sizeof(file->uid), &d_inode->i_uid);
+    bpf_probe_read(&file->gid, sizeof(file->gid), &d_inode->i_gid);
+
+    bpf_probe_read(&file->ctime, sizeof(file->ctime), &d_inode->i_ctime);
+    bpf_probe_read(&file->mtime, sizeof(file->mtime), &d_inode->i_mtime);
+}
+
 
 static struct syscall_cache_t *__attribute__((always_inline)) peek_syscall(u64 type) {
     u64 key = bpf_get_current_pid_tgid();
